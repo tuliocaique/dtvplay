@@ -1,0 +1,48 @@
+{
+  "name": "DTVPlay",
+  "version": "1.0.0",
+  "description": "",
+  "main": "CC_WebService/api.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "cross-env NODE_ENV=development node CC_WebService/api.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tuliocaique/dtvplay.git"
+  },
+  "keywords": [
+    "ginga",
+    "dtv",
+    "dtvplay"
+  ],
+  "author": "Tulio Caique",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/tuliocaique/dtvplay/issues"
+  },
+  "homepage": "https://github.com/tuliocaique/dtvplay",
+  "dependencies": {
+    "body-parser": "^1.19.1",
+    "compression": "^1.0.11",
+    "cors": "^2.4.1",
+    "cross-env": "^7.0.3",
+    "dotenv": "^0.4.0",
+    "ecdh": "^0.1.1",
+    "errorhandler": "^1.1.1",
+    "express": "^4.17.2",
+    "express-jwt": "^0.3.1",
+    "https": "^1.0.0",
+    "jsonwebtoken": "^5.0.1",
+    "kodi-ws": "^2.4.3",
+    "lodash": "^2.4.1",
+    "morgan": "^1.2.3",
+    "mysql": "^2.18.1",
+    "mysql2": "^2.3.3",
+    "node-ssdp": "^4.0.1",
+    "nodemon": "^2.0.15",
+    "peer-ssdp": "^0.0.5",
+    "request": "^2.88.2",
+    "telegraf": "^4.5.2"
+  }
+}
