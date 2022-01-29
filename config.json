@@ -5,5 +5,11 @@
   "refreshTokenSecret": "teste2",
   "port": 3000,
   "tokenLife": 900,
-  "refreshTokenLife": 86400
+  "refreshTokenLife": 86400,
+  "database": {
+    "host": "",
+    "database": "",
+    "user": "",
+    "password": ""
+  }
 }
