@@ -1,9 +1,10 @@
 const express           = require('express'),
         _               = require('lodash'),
         crypto          = require('crypto'),
-        ecdh            = require('ecdh'),
         jwt             = require('jsonwebtoken'),
         jwt_express     = require('express-jwt'),
+        ECDHCrypto      = require("ecdh-crypto"),
+        fs              = require('fs'),
         config          = require('../config.json'),
         tools           = require('../tools'),
         kodi            = require('../kodi-controller'),
@@ -11,10 +12,12 @@ const express           = require('express'),
 
 const app = module.exports = express.Router();
 
-const CLI_PUBLIC_KEY = '3039f7f3cb546c277b6d6823092f2afb4f8a9069b25f97f55b8149e2d0171ec86c5ddb124ad0714ee564f6d31b0c414e933e77ab1db0d2f021baef46cc525298'; //temporario, remover dps
-const GINGA_PUBLIC_KEY = '082dfa5c368fd8d8f45b7fa900658438382b6d97304d32b3cb2e4f0f7fc6c62690e839e595ff1b6f9333cfe533ef6cfc1dad7a5e6646801cdd89ccd496d35609';
-const GINGA_PRIVATE_KEY = 'fa5cc67766a68c72f7ed6211f4165b1d184f5aa4d72bc5b279dbfb58f2247914';
+generateKeyPair(); //vai gerar as keys (privada e publica) e salvar como .pem
+const gingaPairKey = getPairKeys();
+const GINGA_PUBLIC_KEY = gingaPairKey.publicKey;
+const GINGA_PRIVATE_KEY = gingaPairKey.privateKey;
 
+const randomString = (Math.random() + 1).toString(36).substring(7);
 
 /** inicio: funções para gerar o token jwt **/
 function createIdToken(client) {
@@ -76,24 +79,92 @@ function getUserScheme(req) {
 
 
 /** inicio: funções auxiliares **/
-async function getChallenge(client_public_key) {
-    // const curve = ecdh.getCurve('secp256k1');
-    //
-    // const gingaKeys = {
-    //     publicKey: ecdh.PublicKey.fromBuffer(curve, await tools.hexToBuffer(GINGA_PUBLIC_KEY)),
-    //     privateKey: ecdh.PrivateKey.fromBuffer(curve, await tools.hexToBuffer(GINGA_PRIVATE_KEY))
-    // };
-    // const clientKeys = {
-    //     publicKey: ecdh.PublicKey.fromBuffer(curve, await tools.hexToBuffer(client_public_key))
-    // };
-    // const gingaSharedSecret = gingaKeys.privateKey.deriveSharedSecret(clientKeys.publicKey);
-    return null;
+function generateKeyPair() {
+    var privateKey = ECDHCrypto.createECDHCrypto('P-256');
+    var publickey = privateKey.asPublicECDHCrypto();
+
+    fs.writeFileSync("public_key.pem", publickey.toString('pem'));
+    fs.writeFileSync("private_key.pem", privateKey.toString('pem'));
 }
 
+function getPairKeys(){
+    var privatePem = fs.readFileSync('private_key.pem');
+    var privateKey = new ECDHCrypto(privatePem, 'pem');
+
+    var publicPem = fs.readFileSync('public_key.pem');
+    var publicKey = new ECDHCrypto(publicPem, 'pem');
+
+    return {
+        privateKey: privateKey.toString('rfc5208'),
+        publicKey: publicKey.toString('rfc5280')
+    }
+}
+
+function generateX509Cert() {
+    const forge = require('node-forge');
+    const pki = forge.pki;
+
+    var keyPair = pki.rsa.generateKeyPair(128);
+
+    var cert = pki.createCertificate();
+
+    cert.publicKey = keyPair.publicKey;
+    cert.serialNumber = '01';
+    cert.validity.notBefore = new Date();
+    cert.validity.notAfter = new Date();
+    cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 1);
+
+    var attrs = [{
+        name: 'commonName',
+        value: 'dtvplay.org'
+    }, {
+        name: 'countryName',
+        value: 'BR'
+    }, {
+        shortName: 'ST',
+        value: 'Minas Gerais'
+    }, {
+        name: 'localityName',
+        value: 'Rio Pomba'
+    }, {
+        name: 'organizationName',
+        value: 'IF Sudeste MG'
+    }, {
+        shortName: 'OU',
+        value: 'DTV Play'
+    }];
+
+    cert.setSubject(attrs);
+    cert.setIssuer(attrs);
+    cert.sign(keyPair.privateKey);
+    return pki.certificateToPem(cert);
+}
+
+async function getChallenge() {
+    var privatePem = fs.readFileSync('private_key.pem');
+    var privateKey = new ECDHCrypto(privatePem, 'pem');
+
+    return privateKey.createSign('SHA256')
+        .update(randomString)
+        .sign('base64');
+}
+
+async function getVerifyChallenge(challengeResponse) {
+    var privatePem = fs.readFileSync('private_key.pem');
+    var privateKey = new ECDHCrypto(privatePem, 'pem');
+
+    var signature = privateKey.createSign('SHA256')
+        .update(randomString)
+        .sign('base64');
+
+    return privateKey.createVerify('SHA256')
+        .update(challengeResponse)
+        .verify(signature, 'base64');
+}
 
 async function isFirstAccess(appid) {
     const application = await db.selectApplication(appid);
-    return (application.length > 0 ? false : true);
+    return (application.length === 0);
 }
 
 async function isApplicationAuthorized(appid) {
@@ -109,28 +180,19 @@ async function isApplicationPaired(appid) {
 }
 
 async function generatePinCode(client_public_key) {
-    const curve = ecdh.getCurve('secp256k1');
+    var privateKeyGinga = await new ECDHCrypto(fs.readFileSync('private_key.pem'), 'pem');
+    var publicKeyClient = await new ECDHCrypto(client_public_key, 'rfc5280');
+    var sharedSecret = await privateKeyGinga.computeSecret(publicKeyClient).toString('hex');
 
-    const gingaKeys = {
-        publicKey: ecdh.PublicKey.fromBuffer(curve, await tools.hexToBuffer(GINGA_PUBLIC_KEY)),
-        privateKey: ecdh.PrivateKey.fromBuffer(curve, await tools.hexToBuffer(GINGA_PRIVATE_KEY))
-    };
-    const clientKeys = {
-        publicKey: ecdh.PublicKey.fromBuffer(curve, await tools.hexToBuffer(client_public_key))
-    };
-    const gingaSharedSecret = gingaKeys.privateKey.deriveSharedSecret(clientKeys.publicKey);
-
-    return parseInt(gingaSharedSecret.toString('hex'), 16) % 10000;
+    var hash = crypto.createHash('sha256');
+    sharedSecret = hash.update(sharedSecret);
+    sharedSecret = hash.digest(sharedSecret);
+    const code = sharedSecret.toString('hex');
+    return parseInt(code, 16) % 10000;
 }
 
 async function displayPinCode(displayName, pincode){
-    kodi.prototype
-        .pin(displayName, pincode)
-        .then(async () => {
-
-        }).catch(e => function (e){
-        console.error(e)
-    });
+    await kodi.prototype.pin(displayName, pincode);
 }
 /** fim: funções auxiliares **/
 
@@ -138,7 +200,7 @@ async function displayPinCode(displayName, pincode){
 app.get("/dtv/authorize", async function (req, res) {
     const query = req.query;
     const firstAccess = await isFirstAccess(query['appid']); //verifica se é a primeira vez que o cliente acessa o app
-    const challenge = await getChallenge(query['key']); //gera o challenge
+    const challenge = await getChallenge(); //gera o challenge
 
     if (firstAccess) {
         kodi.prototype
@@ -152,14 +214,13 @@ app.get("/dtv/authorize", async function (req, res) {
                 }
                 await db.insertApplication(newApplication);
 
-                await tools.sleep(20000); //aguarda por 20s a resposta do cliente
+                await tools.sleep(10000); //aguarda por 10s a resposta do cliente
 
                 const isAuthorized = await isApplicationAuthorized(query['appid']); //verifica a resposta da autorização
 
                 if (isAuthorized) {
-                    let pincode = parseInt(challenge, 16) % 10000;
-                    await displayPinCode(query['display-name'], pincode); //exibe o pincode na tela
-
+                    let pincode = await generatePinCode(decodeURIComponent(query['key'])); //gera o pincode
+                    await displayPinCode(query['display-name'], pincode); //exibe na tela o pincode
                     res.status(201).send({
                         firstAccess: true,
                         challenge: challenge,
@@ -180,9 +241,8 @@ app.get("/dtv/authorize", async function (req, res) {
     } else {
         const isPaired = await isApplicationPaired(query['appid']); //verifica se a aplicação já está pareada atraves do pin code
         if (!isPaired) {
-            let pincode = await generatePinCode(query['key']);//caso não esteja, gera o pincode e o exibe na tela
-            displayPinCode(query['display-name'], pincode);
-
+            let pincode = await generatePinCode(query['key']); //caso não esteja, gera o pincode e o exibe na tela
+            await displayPinCode(query['display-name'], pincode);
             res.status(201).send({
                 firstAccess: true,
                 challenge: challenge,
@@ -208,18 +268,12 @@ app.get("/dtv/token", async function (req, res) {
     }
     await db.updateApplication(updateApplication);
 
-    kodi.prototype
-        .closePinWindow()
-        .then(async () => {
-
-        }).catch(e => function (e){
-        console.error(e)
-    });
+    await kodi.prototype.closePinWindow();
 
     const application = await db.selectApplication(query['appid']);
-    const isApplicationExists = (application.length === 0);
+    const isApplicationExists = (application.length === 1);
 
-    if(isApplicationExists){
+    if(!isApplicationExists){
         res.status(101).end();
     } else {
         const client = {
@@ -235,7 +289,7 @@ app.get("/dtv/token", async function (req, res) {
             tokenType: 'Bearer',
             expiresIn: config.tokenLife,
             refreshToken: refreshToken,
-            serverCert: ''
+            serverCert: generateX509Cert()
         });
     }
 });

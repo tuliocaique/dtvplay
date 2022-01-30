@@ -32,7 +32,7 @@ function requireScope(scope) {
 
 //app.use('/dtv/current-service', jwtCheck, requireScope('full_access'));
 app.use(express.json());
-app.use(express.urlencoded());
+//app.use(express.urlencoded());
 
 app.post('/dtv/current-service', async function(req, res) {
     const query = req.body;

@@ -23,12 +23,18 @@
   },
   "homepage": "https://github.com/tuliocaique/dtvplay",
   "dependencies": {
+    "@elastosfoundation/did-js-sdk": "^2.2.4",
+    "@elastosfoundation/elastos-js-sdk": "^1.2.12",
+    "asn1": "^0.2.6",
     "body-parser": "^1.19.1",
     "compression": "^1.0.11",
     "cors": "^2.4.1",
     "cross-env": "^7.0.3",
+    "dhcurve": "^1.3.0",
+    "did-js-sdk": "^2.0.12",
     "dotenv": "^0.4.0",
     "ecdh": "^0.1.1",
+    "ecdh-crypto": "^1.0.5",
     "errorhandler": "^1.1.1",
     "express": "^4.17.2",
     "express-jwt": "^0.3.1",
@@ -39,10 +45,10 @@
     "morgan": "^1.2.3",
     "mysql": "^2.18.1",
     "mysql2": "^2.3.3",
+    "node-forge": "^1.2.1",
     "node-ssdp": "^4.0.1",
     "nodemon": "^2.0.15",
     "peer-ssdp": "^0.0.5",
-    "request": "^2.88.2",
-    "telegraf": "^4.5.2"
+    "request": "^2.88.2"
   }
 }

@@ -27,7 +27,6 @@ if (process.env.NODE_ENV === 'development') {
   app.use(errorhandler())
 }
 
-app.use(require('./anonymous-routes'));
 app.use(require('./media-controller'));
 app.use(require('./authorization'));
 app.use(require('./utils'));
