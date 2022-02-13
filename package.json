@@ -39,6 +39,7 @@
     "express": "^4.17.2",
     "express-jwt": "^0.3.1",
     "https": "^1.0.0",
+    "ip": "^1.1.5",
     "jsonwebtoken": "^5.0.1",
     "kodi-ws": "^2.4.3",
     "lodash": "^2.4.1",

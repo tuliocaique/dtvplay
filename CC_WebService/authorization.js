@@ -18,6 +18,7 @@ const GINGA_PUBLIC_KEY = gingaPairKey.publicKey;
 const GINGA_PRIVATE_KEY = gingaPairKey.privateKey;
 
 const randomString = (Math.random() + 1).toString(36).substring(7);
+console.log("randomString: ",randomString);
 
 /** inicio: funções para gerar o token jwt **/
 function createIdToken(client) {
@@ -104,11 +105,11 @@ function generateX509Cert() {
     const forge = require('node-forge');
     const pki = forge.pki;
 
-    var keyPair = pki.rsa.generateKeyPair(128);
+    var keys = pki.rsa.generateKeyPair(2048); //só consegui gerar o certificando usando chaves do tipo rsa (as chaves geradas nas etapas anteriores são do tipo ecdh)
 
     var cert = pki.createCertificate();
 
-    cert.publicKey = keyPair.publicKey;
+    cert.publicKey = keys.publicKey;
     cert.serialNumber = '01';
     cert.validity.notBefore = new Date();
     cert.validity.notAfter = new Date();
@@ -136,31 +137,14 @@ function generateX509Cert() {
 
     cert.setSubject(attrs);
     cert.setIssuer(attrs);
-    cert.sign(keyPair.privateKey);
-    return pki.certificateToPem(cert);
+    cert.sign(keys.privateKey);
+    return encodeURIComponent(pki.certificateToPem(cert));
 }
 
 async function getChallenge() {
-    var privatePem = fs.readFileSync('private_key.pem');
-    var privateKey = new ECDHCrypto(privatePem, 'pem');
-
-    return privateKey.createSign('SHA256')
-        .update(randomString)
-        .sign('base64');
+    return 'indisponivel'
 }
 
-async function getVerifyChallenge(challengeResponse) {
-    var privatePem = fs.readFileSync('private_key.pem');
-    var privateKey = new ECDHCrypto(privatePem, 'pem');
-
-    var signature = privateKey.createSign('SHA256')
-        .update(randomString)
-        .sign('base64');
-
-    return privateKey.createVerify('SHA256')
-        .update(challengeResponse)
-        .verify(signature, 'base64');
-}
 
 async function isFirstAccess(appid) {
     const application = await db.selectApplication(appid);
@@ -188,69 +172,81 @@ async function generatePinCode(client_public_key) {
     sharedSecret = hash.update(sharedSecret);
     sharedSecret = hash.digest(sharedSecret);
     const code = sharedSecret.toString('hex');
-    return parseInt(code, 16) % 10000;
+    return (parseInt(code, 16) % 10000) > 999 ? (parseInt(code, 16) % 10000) : generatePinCode(client_public_key);
 }
 
 async function displayPinCode(displayName, pincode){
     await kodi.prototype.pin(displayName, pincode);
+}
+function isset(arr){
+    return typeof arr !== 'undefined';
 }
 /** fim: funções auxiliares **/
 
 
 app.get("/dtv/authorize", async function (req, res) {
     const query = req.query;
-    const firstAccess = await isFirstAccess(query['appid']); //verifica se é a primeira vez que o cliente acessa o app
-    const challenge = await getChallenge(); //gera o challenge
+    let error = [];
 
-    if (firstAccess) {
-        kodi.prototype
-            .authorization(query['display-name'], query['appid']) //exibe o popup de autorização
-            .then(async () => {
-                const newApplication = {
-                    application_id: query['appid'],
-                    application_name: query['display-name'],
-                    is_authorized: false,
-                    is_paired: false
-                }
-                await db.insertApplication(newApplication);
+    if (isset(query['pm'])){
+        if (query['pm'] !== 'kex' && query['pm'] !== 'qrcode') {
+            error.push(101);
+        } else if (query['pm'] !== 'kex'){
+            if (query['kxp'] !== 'ecdh') {
+                error.push(101);
+            }
+        }
+    }
 
-                await tools.sleep(10000); //aguarda por 10s a resposta do cliente
+    if (!isset(query['appid']) || !isset(query['display-name'])){
+        error.push(105);
+    }
 
-                const isAuthorized = await isApplicationAuthorized(query['appid']); //verifica a resposta da autorização
-
-                if (isAuthorized) {
-                    let pincode = await generatePinCode(decodeURIComponent(query['key'])); //gera o pincode
-                    await displayPinCode(query['display-name'], pincode); //exibe na tela o pincode
-                    res.status(201).send({
-                        firstAccess: true,
-                        challenge: challenge,
-                        key: GINGA_PUBLIC_KEY
-                    });
-                } else {
-                    res.status(201).send({
-                        firstAccess: true,
-                        challenge: challenge,
-                        key: GINGA_PUBLIC_KEY
-                    });
-                }
-            }).catch(e =>
-                res.status(103).send({
-                    error: e
-                })
-            );
+    if (error.length > 0) {
+        res.status(error[0]).end();
     } else {
-        const isPaired = await isApplicationPaired(query['appid']); //verifica se a aplicação já está pareada atraves do pin code
-        if (!isPaired) {
-            let pincode = await generatePinCode(query['key']); //caso não esteja, gera o pincode e o exibe na tela
-            await displayPinCode(query['display-name'], pincode);
-            res.status(201).send({
-                firstAccess: true,
-                challenge: challenge,
-                key: GINGA_PUBLIC_KEY
-            });
+        const firstAccess = await isFirstAccess(query['appid']); //verifica se é a primeira vez que o cliente acessa o app
+        const isAuthorized = await isApplicationAuthorized(query['appid']);
+        const challenge = await getChallenge(); //gera o challenge
+
+        if (isAuthorized === false) {
+            const newApplication = {
+                application_id: query['appid'],
+                application_name: query['display-name'],
+                is_authorized: false,
+                is_paired: false
+            }
+            await db.insertApplication(newApplication);
+
+            await kodi.prototype
+                .authorization(query['display-name'], query['appid']) //exibe o popup de autorização
+                .then(async () =>
+                {
+                    await tools.sleep(10000); //aguarda por 10s a resposta do cliente
+                    const isNowAuthorized =   await isApplicationAuthorized(query['appid']); //verifica a resposta da autorização
+
+                    if (isNowAuthorized === false) {
+                        await db.deleteApplication(newApplication);
+                        error.push(102);
+                    }
+                }).catch(e =>
+                    error.push(103)
+                );
+        }
+
+        if (error.length > 0) {
+            res.status(error[0]).end();
         } else {
+            const isPaired = await isApplicationPaired(query['appid']); //verifica se a aplicação já está pareada
+            if (isPaired === false) {
+                if (query['pm'] === 'kex') {
+                    let pincode = await generatePinCode(decodeURIComponent(query['key'])); //gera o pincode e o exibe na tela
+                    await displayPinCode(query['display-name'], pincode);
+                }
+            }
+
             res.status(201).send({
-                firstAccess: false,
+                firstAccess: firstAccess,
                 challenge: challenge,
                 key: GINGA_PUBLIC_KEY
             });
@@ -273,7 +269,7 @@ app.get("/dtv/token", async function (req, res) {
     const application = await db.selectApplication(query['appid']);
     const isApplicationExists = (application.length === 1);
 
-    if(!isApplicationExists){
+    if (isApplicationExists === false){
         res.status(101).end();
     } else {
         const client = {

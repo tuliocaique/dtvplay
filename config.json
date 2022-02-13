@@ -6,10 +6,10 @@
   "port": 3000,
   "tokenLife": 900,
   "refreshTokenLife": 86400,
-  "database": {
+  "db": {
     "host": "",
-    "database": "",
     "user": "",
-    "password": ""
+    "password": "",
+    "database": ""
   }
 }

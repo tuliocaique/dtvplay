@@ -4,7 +4,8 @@ const logger          = require('morgan'),
       express         = require('express'),
       errorhandler    = require('errorhandler'),
       dotenv          = require('dotenv'),
-      bodyParser      = require('body-parser');
+      bodyParser      = require('body-parser'),
+      ssdpServer      = require('../ssdp-server.js');
 
 const app = express();
 
@@ -30,11 +31,13 @@ if (process.env.NODE_ENV === 'development') {
 app.use(require('./media-controller'));
 app.use(require('./authorization'));
 app.use(require('./utils'));
+app.use(require('./location'));
 
 const port = process.env.PORT || 8081;
 
-http.createServer(app).
-listen(port, function (err) {
-  console.log('listening in http://localhost:' + port + '/CC_WebService');
+http.createServer(app).listen(port, function (err) {
+  console.log('listening in http://localhost:' + port);
+  ssdpServer.prototype.start().then(r => {
+    console.log('SSDP server started');
+  });
 });
-
