@@ -8,7 +8,7 @@ const express           = require('express'),
         config          = require('../config.json'),
         tools           = require('../tools'),
         kodi            = require('../kodi-controller'),
-        db              = require("../db");
+        storage         = require("../storage");
 
 const app = module.exports = express.Router();
 
@@ -18,7 +18,6 @@ const GINGA_PUBLIC_KEY = gingaPairKey.publicKey;
 const GINGA_PRIVATE_KEY = gingaPairKey.privateKey;
 
 const randomString = (Math.random() + 1).toString(36).substring(7);
-console.log("randomString: ",randomString);
 
 /** inicio: funções para gerar o token jwt **/
 function createIdToken(client) {
@@ -145,21 +144,20 @@ async function getChallenge() {
     return 'indisponivel'
 }
 
-
 async function isFirstAccess(appid) {
-    const application = await db.selectApplication(appid);
-    return (application.length === 0);
+    const application = storage.selectApplication(appid);
+    return (!application);
 }
 
 async function isApplicationAuthorized(appid) {
-    const application = await db.selectApplication(appid);
-    if (application.length > 0) return (application[0].is_authorized === 1);
+    const application = storage.selectApplication(appid);
+    if (application !== false) return (application.is_authorized === 1);
     else return false;
 }
 
 async function isApplicationPaired(appid) {
-    const application = await db.selectApplication(appid);
-    if (application.length > 0) return (application[0].is_paired === 1);
+    const application = storage.selectApplication(appid);
+    if (application !== false) return (application.is_paired === 1);
     else return false;
 }
 
@@ -175,8 +173,8 @@ async function generatePinCode(client_public_key) {
     return (parseInt(code, 16) % 10000) > 999 ? (parseInt(code, 16) % 10000) : generatePinCode(client_public_key);
 }
 
-async function displayPinCode(displayName, pincode){
-    await kodi.prototype.pin(displayName, pincode);
+async function displayPinCode(displayName, pin){
+    await kodi.prototype.pin(displayName, pin);
 }
 function isset(arr){
     return typeof arr !== 'undefined';
@@ -216,7 +214,7 @@ app.get("/dtv/authorize", async function (req, res) {
                 is_authorized: false,
                 is_paired: false
             }
-            await db.insertApplication(newApplication);
+            storage.insertApplication(newApplication);
 
             await kodi.prototype
                 .authorization(query['display-name'], query['appid']) //exibe o popup de autorização
@@ -226,7 +224,7 @@ app.get("/dtv/authorize", async function (req, res) {
                     const isNowAuthorized =   await isApplicationAuthorized(query['appid']); //verifica a resposta da autorização
 
                     if (isNowAuthorized === false) {
-                        await db.deleteApplication(newApplication);
+                        storage.deleteApplication(newApplication);
                         error.push(102);
                     }
                 }).catch(e =>
@@ -262,19 +260,19 @@ app.get("/dtv/token", async function (req, res) {
         is_authorized: true,
         is_paired: true
     }
-    await db.updateApplication(updateApplication);
+    storage.insertApplication(updateApplication);
 
     await kodi.prototype.closePinWindow();
 
-    const application = await db.selectApplication(query['appid']);
-    const isApplicationExists = (application.length === 1);
+    const application = storage.selectApplication(query['appid']);
+    const isApplicationExists = (application !== false);
 
     if (isApplicationExists === false){
         res.status(101).end();
     } else {
         const client = {
-            appid: application[0].application_id,
-            application_name: application[0].application_name
+            appid: application.application_id,
+            application_name: application.application_name
         };
 
         const accessToken = createAccessToken();

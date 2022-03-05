@@ -1,7 +1,6 @@
 const express   = require('express'),
         _       = require('lodash');
-
-const db = require("../db");
+const storage = require("../storage");
 
 const app = module.exports = express.Router();
 
@@ -15,9 +14,10 @@ app.post("/kodi", async function (req, res) {
         case 'authorizationAnswer':
             const application = {
                 application_id : data.application_id,
-                is_authorized : (data.is_authorized === 'True' ? 1 : 0),
+                is_authorized : (data.is_authorized === 'True'),
+                is_paired: false
             }
-            await db.updateApplication(application);
+            storage.insertApplication(application);
             break;
     }
 
