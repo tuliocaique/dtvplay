@@ -1,4 +1,4 @@
-const express           = require('express'),
+const   express         = require('express'),
         _               = require('lodash'),
         crypto          = require('crypto'),
         jwt             = require('jsonwebtoken'),
@@ -151,7 +151,7 @@ async function isFirstAccess(appid) {
 
 async function isApplicationAuthorized(appid) {
     const application = storage.selectApplication(appid);
-    if (application !== false) return (application.is_authorized === 1);
+    if (application !== false) return (application.is_authorized === true);
     else return false;
 }
 
@@ -186,10 +186,10 @@ app.get("/dtv/authorize", async function (req, res) {
     const query = req.query;
     let error = [];
 
-    if (isset(query['pm'])){
+    if (isset(query['pm'])) {
         if (query['pm'] !== 'kex' && query['pm'] !== 'qrcode') {
             error.push(101);
-        } else if (query['pm'] !== 'kex'){
+        } else if (query['pm'] !== 'kex') {
             if (query['kxp'] !== 'ecdh') {
                 error.push(101);
             }
@@ -233,7 +233,7 @@ app.get("/dtv/authorize", async function (req, res) {
         }
 
         if (error.length > 0) {
-            res.status(error[0]).end();
+            res.status(202).send({code: error[0] }).end();
         } else {
             const isPaired = await isApplicationPaired(query['appid']); //verifica se a aplicação já está pareada
             if (isPaired === false) {
@@ -268,7 +268,7 @@ app.get("/dtv/token", async function (req, res) {
     const isApplicationExists = (application !== false);
 
     if (isApplicationExists === false){
-        res.status(101).end();
+        res.status(400).send({code: 101});
     } else {
         const client = {
             appid: application.application_id,

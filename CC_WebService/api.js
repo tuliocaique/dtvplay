@@ -33,11 +33,9 @@ app.use(require('./authorization'));
 app.use(require('./utils'));
 app.use(require('./location'));
 
-const port = process.env.PORT || 8081;
+const port = process.env.PORT || 44642;
 
 http.createServer(app).listen(port, function (err) {
-  console.log('listening in http://localhost:' + port);
-  ssdpServer.prototype.start().then(r => {
-    console.log('SSDP server started');
-  });
+  console.log('>> GingaCC-Server foi iniciado em http://localhost:' + port);
+  ssdpServer.prototype.start();
 });

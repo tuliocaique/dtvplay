@@ -1,2 +1,3 @@
 /CC_WebService/private_key.pem
 /CC_WebService/public_key.pem
+storage/**

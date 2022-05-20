@@ -1,6 +1,6 @@
 const fs = require('fs');
 
-function selectApplication(application_id){
+function selectApplication(application_id) {
     const path = '../storage/'+application_id+'.json';
     try {
         if (fs.existsSync(path)) {
@@ -14,7 +14,7 @@ function selectApplication(application_id){
     }
 }
 
-function insertApplication(application){
+function insertApplication(application) {
     const path = '../storage/'+application.application_id+'.json';
     try {
         let content = {
@@ -29,7 +29,7 @@ function insertApplication(application){
     }
 }
 
-function deleteApplication(application){
+function deleteApplication(application) {
     const path = '../storage/'+application.application_id+'.json';
     try {
         if (fs.existsSync(path)) {

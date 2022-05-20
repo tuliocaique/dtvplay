@@ -1,5 +1,5 @@
 {
-  "name": "DTVPlay",
+  "name": "dtvplay",
   "version": "1.0.0",
   "description": "",
   "main": "CC_WebService/api.js",
@@ -38,7 +38,6 @@
     "errorhandler": "^1.1.1",
     "express": "^4.17.2",
     "express-jwt": "^0.3.1",
-    "https": "^1.0.0",
     "ip": "^1.1.5",
     "jsonwebtoken": "^5.0.1",
     "kodi-ws": "^2.4.3",
@@ -47,7 +46,6 @@
     "node-forge": "^1.2.1",
     "node-ssdp": "^4.0.1",
     "nodemon": "^2.0.15",
-    "peer-ssdp": "^0.0.5",
-    "request": "^2.88.2"
+    "peer-ssdp": "^0.0.5"
   }
 }
