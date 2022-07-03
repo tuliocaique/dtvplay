@@ -176,35 +176,70 @@ async function generatePinCode(client_public_key) {
 async function displayPinCode(displayName, pin){
     await kodi.prototype.pin(displayName, pin);
 }
+
 function isset(arr){
     return typeof arr !== 'undefined';
 }
 /** fim: funções auxiliares **/
 
+const ERRORS_100 = [
+    "API not found",
+    "Illegal argument value",
+    "Access not authorized by user",
+    "Unable to ask for user authorization",
+    "Access not authorized by the broadcaster",
+    "Missing argument",
+    "API unavailable for this runtime environment",
+    "Invalid or outdated access token",
+    "Invalid or revoked bind token",
+];
+
+const ERRORS_200 = [
+    "Platform resource unavailable"
+];
+
+const ERRORS_300 = [
+    "No DTV service currently in use",
+    "Service information cache unavailable",
+    "No DTV signal",
+    "Empty DTV channel list",
+    "DTV service not found",
+    "DTV resource not found"
+];
+
+const ERRORS_400 = [
+    "Network service unavailable",
+    "Unsupported or invalid state transition",
+    "Unsupported or invalid priority transition",
+    "Unhandled URL scheme",
+    "URL not found"
+];
 
 app.get("/dtv/authorize", async function (req, res) {
     const query = req.query;
-    let error = [];
+    let isAuthorized = false;
+    let error_100 = [];
+    let error_200 = [];
+    let error_300 = [];
+    let error_400 = [];
 
     if (isset(query['pm'])) {
         if (query['pm'] !== 'kex' && query['pm'] !== 'qrcode') {
-            error.push(101);
+            error_100.push(101);
         } else if (query['pm'] !== 'kex') {
             if (query['kxp'] !== 'ecdh') {
-                error.push(101);
+                error_100.push(101);
             }
         }
     }
 
     if (!isset(query['appid']) || !isset(query['display-name'])){
-        error.push(105);
+        error_100.push(105);
     }
 
-    if (error.length > 0) {
-        res.status(error[0]).end();
-    } else {
+    if (error_100.length === 0) {
         const firstAccess = await isFirstAccess(query['appid']); //verifica se é a primeira vez que o cliente acessa o app
-        const isAuthorized = await isApplicationAuthorized(query['appid']);
+        isAuthorized = await isApplicationAuthorized(query['appid']);
         const challenge = await getChallenge(); //gera o challenge
 
         if (isAuthorized === false) {
@@ -221,22 +256,22 @@ app.get("/dtv/authorize", async function (req, res) {
                 .then(async () =>
                 {
                     await tools.sleep(10000); //aguarda por 10s a resposta do cliente
-                    const isNowAuthorized =   await isApplicationAuthorized(query['appid']); //verifica a resposta da autorização
+                    isAuthorized = await isApplicationAuthorized(query['appid']); //verifica a resposta da autorização
 
-                    if (isNowAuthorized === false) {
+                    if (isAuthorized === false) {
                         storage.deleteApplication(newApplication);
-                        error.push(102);
+                        await kodi.prototype.closeAlertWindow();
+                        error_100.push(102);
                     }
                 }).catch(e =>
-                    error.push(103)
+                    error_100.push(103)
                 );
         }
 
-        if (error.length > 0) {
-            res.status(202).send({code: error[0] }).end();
-        } else {
+        if (error_100.length === 0) {
             const isPaired = await isApplicationPaired(query['appid']); //verifica se a aplicação já está pareada
-            if (isPaired === false) {
+            isAuthorized = await isApplicationAuthorized(query['appid']); //verifica se a aplicação está autorizada
+            if (isPaired === false && isAuthorized === true) {
                 if (query['pm'] === 'kex') {
                     let pincode = await generatePinCode(decodeURIComponent(query['key'])); //gera o pincode e o exibe na tela
                     await displayPinCode(query['display-name'], pincode);
@@ -250,10 +285,36 @@ app.get("/dtv/authorize", async function (req, res) {
             });
         }
     }
+
+    if (error_100.length > 0) {
+        res.status(404).send({
+            error: error_100[0],
+            description: ERRORS_100[error_100[0]-100]
+        });
+    } else if (error_200.length > 0) {
+        res.status(404).send({
+            error: error_200[0],
+            description: ERRORS_200[error_200[0]-200]
+        });
+    } else if (error_300.length > 0) {
+        res.status(404).send({
+            error: error_300[0],
+            description: ERRORS_300[error_300[0]-300]
+        });
+    } else if (error_400.length > 0) {
+        res.status(404).send({
+            error: error_400[0],
+            description: ERRORS_400[error_400[0]-400]
+        });
+    }
 });
 
 app.get("/dtv/token", async function (req, res) {
     const query = req.query;
+    let error_100 = [];
+    let error_200 = [];
+    let error_300 = [];
+    let error_400 = [];
 
     const updateApplication = {
         application_id: query['appid'],
@@ -262,13 +323,13 @@ app.get("/dtv/token", async function (req, res) {
     }
     storage.insertApplication(updateApplication);
 
-    await kodi.prototype.closePinWindow();
+    await kodi.prototype.closeAlertWindow();
 
     const application = storage.selectApplication(query['appid']);
     const isApplicationExists = (application !== false);
 
     if (isApplicationExists === false){
-        res.status(400).send({code: 101});
+        error_100.push(101);
     } else {
         const client = {
             appid: application.application_id,
@@ -284,6 +345,28 @@ app.get("/dtv/token", async function (req, res) {
             expiresIn: config.tokenLife,
             refreshToken: refreshToken,
             serverCert: generateX509Cert()
+        });
+    }
+
+    if (error_100.length > 0) {
+        res.status(404).send({
+            error: error_100[0],
+            description: ERRORS_100[error_100[0]-100]
+        });
+    } else if (error_200.length > 0) {
+        res.status(404).send({
+            error: error_200[0],
+            description: ERRORS_200[error_200[0]-200]
+        });
+    } else if (error_300.length > 0) {
+        res.status(404).send({
+            error: error_300[0],
+            description: ERRORS_300[error_300[0]-300]
+        });
+    } else if (error_400.length > 0) {
+        res.status(404).send({
+            error: error_400[0],
+            description: ERRORS_400[error_400[0]-400]
         });
     }
 });

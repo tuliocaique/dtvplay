@@ -35,7 +35,7 @@ class kodiController {
             );
     }
 
-    async closePinWindow() {
+    async closeAlertWindow() {
         let speed = await this.getConnection()
             .then(async con =>
                 await con.run('Input.Back')
