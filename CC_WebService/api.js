@@ -32,6 +32,12 @@ app.use(require('./media-controller'));
 app.use(require('./authorization'));
 app.use(require('./utils'));
 app.use(require('./location'));
+app.use(function(req, res, next){
+  res.status(404).send({
+    error: 100,
+    description: "API not found"
+  });
+});
 
 const port = process.env.PORT || 44642;
 
