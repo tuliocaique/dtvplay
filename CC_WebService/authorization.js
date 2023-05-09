@@ -233,7 +233,7 @@ app.get("/dtv/authorize", async function (req, res) {
         }
     }
 
-    if (!isset(query['appid']) || !isset(query['display-name'])){
+    if (!isset(query['appid']) || !isset(query['display-name'])) {
         error_100.push(105);
     }
 
